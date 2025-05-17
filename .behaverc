@@ -1,0 +1,3 @@
+[behave]
+paths = tech/tests/tech/bdd/features
+steps_dir = tech/tests/tech/bdd/features/steps

@@ -19,7 +19,9 @@ psycopg = {extras = ["binary"], version = "^3.2.2"}
 psycopg-binary = "^3.2.4"
 boto3 = "^1.37.4"
 jose = "^1.0.0"
-
+pymongo = "^4.5.0"
+motor = "^3.3.0"
+certifi = "^2025.4.26"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6.4"
