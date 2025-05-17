@@ -1,35 +1,41 @@
+# tech/use_cases/products/delete_product_use_case.py
 from tech.interfaces.repositories.product_repository import ProductRepository
 
-class DeleteProductUseCase(object):
+
+class DeleteProductUseCase:
     """
-    Handles the deletion of an existing product by its unique ID.
+    Caso de uso para excluir um produto.
     """
 
     def __init__(self, product_repository: ProductRepository):
         """
-        Initialize the use case with the product repository.
+        Inicializa o caso de uso com o repositório de produtos.
 
         Args:
-            product_repository (ProductRepository): Repository to interact with product data.
+            product_repository: Repositório para interagir com os dados dos produtos.
         """
         self.product_repository = product_repository
 
-    def execute(self, product_id: int) -> dict:
+    def execute(self, product_id: str) -> bool:
         """
-        Delete a product by its ID.
+        Exclui um produto pelo ID.
 
         Args:
-            product_id (int): The unique identifier of the product to delete.
+            product_id: ID do produto a ser excluído.
 
         Returns:
-            dict: A message confirming the successful deletion.
+            True se o produto foi excluído com sucesso, False caso contrário.
 
         Raises:
-            ValueError: If the product with the given ID does not exist.
+            ValueError: Se o produto não for encontrado.
         """
-        product = self.product_repository.get_by_id(product_id)
-        if not product:
-            raise ValueError("Product not found")
+        existing_product = self.product_repository.get_by_id(product_id)
+        if not existing_product:
+            raise ValueError(f"Product with ID {product_id} not found")
 
-        self.product_repository.delete(product)
-        return {"message": "Product deleted"}
+        success = self.product_repository.delete(product_id)
+
+        if not success:
+            raise ValueError(f"Failed to delete product with ID {product_id}")
+
+        return success

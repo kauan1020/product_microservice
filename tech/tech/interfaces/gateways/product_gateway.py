@@ -1,24 +1,23 @@
-from sqlalchemy.orm import Session
+# tech/interfaces/gateways/product_gateway.py
+
 from tech.domain.entities.products import Products
 from tech.interfaces.repositories.product_repository import ProductRepository
-from tech.infra.repositories.sql_alchemy_product_repository import SQLAlchemyProductRepository
+from tech.infra.repositories.mongodb_product_repository import MongoDBProductRepository
+
 
 class ProductGateway(ProductRepository):
     """
-    Gateway that acts as an adapter between use cases and the database repository.
+    Gateway that acts as an adapter between use cases and the MongoDB repository.
 
-    This class abstracts the database operations by delegating them to the SQLAlchemy repository,
+    This class abstracts the database operations by delegating them to the MongoDB repository,
     ensuring that the use cases do not directly interact with the database.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self):
         """
-        Initializes the ProductGateway with a database session.
-
-        Args:
-            session (Session): The SQLAlchemy session used for database transactions.
+        Initializes the ProductGateway with a MongoDB repository.
         """
-        self.repository = SQLAlchemyProductRepository(session)
+        self.repository = MongoDBProductRepository()
 
     def add(self, product: Products) -> Products:
         """
@@ -92,14 +91,26 @@ class ProductGateway(ProductRepository):
         """
         return self.repository.update(product)
 
-    def delete(self, product: Products) -> None:
+    def delete(self, product_id) -> bool:
         """
         Deletes a product from the database.
 
         Args:
-            product (Products): The product entity to be deleted.
+            product_id: The ID of the product to delete.
 
-        Raises:
-            ValueError: If the product does not exist.
+        Returns:
+            bool: True if deleted successfully, False otherwise.
         """
-        return self.repository.delete(product)
+        return self.repository.delete(product_id)
+
+    def get_by_ids(self, product_ids: list) -> list:
+        """
+        Gets multiple products by their IDs.
+
+        Args:
+            product_ids (list): List of product IDs to retrieve.
+
+        Returns:
+            list: List of product entities found.
+        """
+        return self.repository.get_by_ids(product_ids)

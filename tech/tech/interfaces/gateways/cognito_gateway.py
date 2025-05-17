@@ -3,8 +3,8 @@ import os
 import hmac
 import hashlib
 import base64
+import json
 from typing import Dict
-
 
 class CognitoGateway:
     """Gateway for interacting with Amazon Cognito services.
@@ -22,9 +22,9 @@ class CognitoGateway:
         Cognito operations.
         """
         self.region = "us-east-1"
-        self.user_pool_id = "us-east-1_TWFX5csEX"
-        self.client_id = "5ot4obr679k4rogta0j3gik5u4"
-        self.client_secret = "123fuhh8ussok7n0n0f78c6b32cnelr7trrn9fm7pgt713vnlffd"
+        self.user_pool_id = "us-east-1_k6nq9jjr3"
+        self.client_id = "7krs58hvehmmanp97ig1h1lpqj"
+        self.client_secret = "lvojlqtnr3q9pjee4g1k2rt1pm461a0rl4nsslk6ud5pt0il8am"
 
         self.client = boto3.client(
             "cognito-idp",
@@ -104,6 +104,41 @@ class CognitoGateway:
         ).digest()
         return base64.b64encode(dig).decode()
 
+    def _decode_jwt_manually(self, token: str) -> dict:
+        """Manually decodes a JWT token without using external libraries.
+
+        Splits the JWT token into its components and decodes the payload (claims).
+        Does not verify the signature.
+
+        Args:
+            token (str): The JWT token to decode.
+
+        Returns:
+            dict: The decoded claims from the token.
+
+        Raises:
+            ValueError: If the token format is invalid or decoding fails.
+        """
+        parts = token.split('.')
+        if len(parts) < 2:
+            raise ValueError("Invalid JWT format - not enough segments")
+
+        payload = parts[1]
+
+        padding = 4 - (len(payload) % 4)
+        if padding < 4:
+            payload += '=' * padding
+
+        payload = payload.replace('-', '+').replace('_', '/')
+
+        try:
+            decoded_bytes = base64.b64decode(payload)
+
+            return json.loads(decoded_bytes.decode('utf-8'))
+        except Exception as e:
+            print(f"Failed to decode JWT payload: {str(e)}")
+            raise ValueError(f"Failed to decode JWT: {str(e)}")
+
     def verify_token(self, token: str) -> Dict:
         """Verifies a JWT token and extracts user information.
 
@@ -125,9 +160,12 @@ class CognitoGateway:
             print(f"Starting token verification: {token[:20]}...")
 
             try:
-                from jose import jwt as jose_jwt
+                try:
+                    decoded_token = self._decode_jwt_manually(token)
+                except Exception as jwt_error:
+                    print(f"JWT decode error: {str(jwt_error)}")
+                    raise ValueError(f"Invalid JWT format: {str(jwt_error)}")
 
-                decoded_token = jose_jwt.get_unverified_claims(token)
                 print(f"Token decoded: {decoded_token}")
 
                 if "cognito:groups" in decoded_token:
@@ -153,6 +191,8 @@ class CognitoGateway:
                     raise ValueError("Token does not contain user identifier")
 
                 print(f"Username/sub extracted from token: {username}")
+            except ValueError as e:
+                raise e
             except Exception as e:
                 print(f"Error decoding token: {str(e)}")
                 raise ValueError(f"Invalid token: {str(e)}")

@@ -1,0 +1,25 @@
+version: "3.8"
+services:
+  tech_app:
+    build: .
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./:/app
+    environment:
+      # Nova string de conexão com o MongoDB Atlas
+      MONGODB_URI: "mongodb+srv://kauansilva:WT7toLFafwnmGvHh@cluster0.rgc1lym.mongodb.net/products?retryWrites=true&w=majority&appName=Cluster0"
+      SERVICE_USERS_URL: "http://host.docker.internal:8000"
+    command: uvicorn tech.api.app:app --host 0.0.0.0 --port 8002 --reload
+    container_name: products_tech_app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - products-network
+      - microservices-network
+
+networks:
+  products-network:
+    name: products-network
+  microservices-network:
+    external: true

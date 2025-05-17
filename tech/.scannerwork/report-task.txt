@@ -1,0 +1,6 @@
+projectKey=products_microservice
+serverUrl=http://host.docker.internal:9000
+serverVersion=25.5.0.107428
+dashboardUrl=http://host.docker.internal:9000/dashboard?id=products_microservice
+ceTaskId=dbd6e1a5-a322-43db-91de-2607005f4d4f
+ceTaskUrl=http://host.docker.internal:9000/api/ce/task?id=dbd6e1a5-a322-43db-91de-2607005f4d4f

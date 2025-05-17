@@ -1,130 +1,122 @@
+# tech/interfaces/controllers/product_controller.py
 from fastapi import HTTPException
+from typing import List, Dict, Any
+
 from tech.use_cases.products.create_product_use_case import CreateProductUseCase
 from tech.use_cases.products.list_products_by_category_use_case import ListProductsByCategoryUseCase
 from tech.use_cases.products.list_all_products_use_case import ListAllProductsUseCase
 from tech.use_cases.products.update_product_use_case import UpdateProductUseCase
 from tech.use_cases.products.delete_product_use_case import DeleteProductUseCase
-from tech.interfaces.presenters.product_presenter import ProductPresenter
 from tech.interfaces.schemas.product_schema import ProductSchema
 
 class ProductController:
     """
-    Controller responsible for managing product-related operations.
-
-    This class acts as an intermediary between the API and the business logic, ensuring proper
-    use of the use cases and handling exceptions.
+    Controlador responsável por gerenciar operações relacionadas a produtos.
     """
 
     def __init__(
-        self,
-        create_product_use_case: CreateProductUseCase,
-        list_products_by_category_use_case: ListProductsByCategoryUseCase,
-        list_all_products_use_case: ListAllProductsUseCase,
-        update_product_use_case: UpdateProductUseCase,
-        delete_product_use_case: DeleteProductUseCase
+            self,
+            create_product_use_case: CreateProductUseCase,
+            list_products_by_category_use_case: ListProductsByCategoryUseCase,
+            list_all_products_use_case: ListAllProductsUseCase,
+            update_product_use_case: UpdateProductUseCase,
+            delete_product_use_case: DeleteProductUseCase
     ):
-        """
-        Initializes the ProductController with the required use cases.
-
-        Args:
-            create_product_use_case (CreateProductUseCase): Use case for creating a product.
-            list_products_by_category_use_case (ListProductsByCategoryUseCase): Use case for listing products by category.
-            list_all_products_use_case (ListAllProductsUseCase): Use case for retrieving all products.
-            update_product_use_case (UpdateProductUseCase): Use case for updating a product.
-            delete_product_use_case (DeleteProductUseCase): Use case for deleting a product.
-        """
         self.create_product_use_case = create_product_use_case
         self.list_products_by_category_use_case = list_products_by_category_use_case
         self.list_all_products_use_case = list_all_products_use_case
         self.update_product_use_case = update_product_use_case
         self.delete_product_use_case = delete_product_use_case
 
-    def create_product(self, product_data: ProductSchema) -> dict:
+    def create_product(self, product_data: ProductSchema) -> Dict[str, Any]:
         """
-        Creates a new product and returns a formatted response.
+        Cria um novo produto e retorna uma resposta formatada.
 
         Args:
-            product_data (ProductSchema): Data required to create a new product.
+            product_data: Os dados necessários para criar um novo produto.
 
         Returns:
-            dict: The formatted response containing product details.
+            Uma resposta formatada contendo os detalhes do produto.
 
         Raises:
-            HTTPException: If a product with the same name already exists.
+            HTTPException: Se o produto já existir ou houver erro de validação.
         """
         try:
             product = self.create_product_use_case.execute(product_data)
-            return ProductPresenter.present_product(product)
+            return product.dict()
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
-    def list_products_by_category(self, category: str) -> list:
+    def list_products_by_category(self, category: str) -> List[Dict[str, Any]]:
         """
-        Retrieves a list of products filtered by category.
+        Lista produtos por categoria.
 
         Args:
-            category (str): The category to filter products by.
+            category: A categoria para filtrar os produtos.
 
         Returns:
-            list: A list of formatted product data.
+            Uma lista de produtos formatados.
 
         Raises:
-            HTTPException: If no products are found in the specified category.
+            HTTPException: Se nenhum produto for encontrado na categoria.
         """
         products = self.list_products_by_category_use_case.execute(category)
         if not products:
-            raise HTTPException(status_code=404, detail=f'No products found in category "{category}"')
-        return ProductPresenter.present_product_list(products)
+            raise HTTPException(status_code=404, detail=f"No products found in category: {category}")
+        return [product.dict() for product in products]
 
-    def list_all_products(self) -> list:
+    def list_all_products(self) -> List[Dict[str, Any]]:
         """
-        Retrieves all available products.
+        Lista todos os produtos disponíveis.
 
         Returns:
-            list: A list of formatted product data.
+            Uma lista de produtos formatados.
 
         Raises:
-            HTTPException: If no products are found.
+            HTTPException: Se nenhum produto for encontrado.
         """
         products = self.list_all_products_use_case.execute()
         if not products:
             raise HTTPException(status_code=404, detail="No products found")
-        return ProductPresenter.present_product_list(products)
+        return [product.dict() for product in products]
 
-    def update_product(self, product_id: int, product_data: ProductSchema) -> dict:
+    def update_product(self, product_id: str, product_data: ProductSchema) -> Dict[str, Any]:
         """
-        Updates a product by its ID.
+        Atualiza um produto existente.
 
         Args:
-            product_id (int): The ID of the product to update.
-            product_data (ProductSchema): The updated product data.
+            product_id: O ID do produto a ser atualizado.
+            product_data: Os novos dados do produto.
 
         Returns:
-            dict: The formatted response containing the updated product details.
+            Uma resposta formatada contendo os detalhes atualizados do produto.
 
         Raises:
-            HTTPException: If the product is not found.
+            HTTPException: Se o produto não for encontrado.
         """
         try:
-            updated_product = self.update_product_use_case.execute(product_id, product_data)
-            return ProductPresenter.present_product(updated_product)
+            product = self.update_product_use_case.execute(product_id, product_data)
+            return product.dict()
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
 
-    def delete_product(self, product_id: int) -> dict:
+    def delete_product(self, product_id: str) -> Dict[str, Any]:
         """
-        Deletes a product by its ID.
+        Remove um produto pelo ID.
 
         Args:
-            product_id (int): The ID of the product to delete.
+            product_id: O ID do produto a remover.
 
         Returns:
-            dict: A success message confirming deletion.
+            Uma mensagem de sucesso confirmando a remoção.
 
         Raises:
-            HTTPException: If the product is not found.
+            HTTPException: Se o produto não for encontrado.
         """
         try:
-            return self.delete_product_use_case.execute(product_id)
+            success = self.delete_product_use_case.execute(product_id)
+            if not success:
+                raise ValueError(f"Product with ID {product_id} not found or could not be deleted")
+            return {"message": f"Product {product_id} deleted successfully"}
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
