@@ -28,7 +28,7 @@ jobs:
           virtualenvs-in-project: false  # Alterado para false para usar o ambiente global
 
       - name: List directory structure
-        run: ls -la && ls -la tech && pwd
+        run: ls -la && ls -la tech && find tech -type d | sort && ls -la k8s
 
       - name: Install dependencies with Poetry
         working-directory: ./tech  # Define o diretório de trabalho como ./tech onde está o pyproject.toml
@@ -44,14 +44,13 @@ jobs:
         working-directory: ./tech  # Define o diretório de trabalho
         run: |
           # Executa diretamente no ambiente do Poetry
-          poetry run pytest tests --cov=tech --cov-report=xml:coverage.xml --cov-report=term || echo "Testes falharam, mas continuando o pipeline"
+          poetry run pytest tests --cov=tech --cov-report=xml:coverage.xml --cov-report=term
 
       - name: Run BDD tests with Behave
         working-directory: ./tech  # Define o diretório de trabalho
         run: |
-          # Executa diretamente no ambiente do Poetry
-          # Ajuste o caminho conforme a estrutura real do seu projeto
-          poetry run behave tests/bdd/features/ || echo "Testes BDD falharam, mas continuando o pipeline"
+          # Executa diretamente no ambiente do Poetry com o caminho correto
+          poetry run behave tests/tech/bdd/features
 
       - name: Move coverage reports to root
         run: |
@@ -128,17 +127,46 @@ jobs:
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name tech-eks-cluster --region us-east-1
 
+      - name: Create namespace if needed
+        run: |
+          # Usar o arquivo namespace.yaml se existir
+          if [ -f k8s/products-service/namespace.yaml ]; then
+            kubectl apply -f k8s/products-service/namespace.yaml
+          else
+            kubectl get namespace products || kubectl create namespace products
+          fi
+
+      # Comentário sobre secrets: Os secrets devem ser gerenciados separadamente e não no CI/CD
+      # Recomendação: Use AWS Secrets Manager ou HashiCorp Vault para gerenciar secrets
+
       - name: Deploy to Kubernetes
         run: |
-          kubectl get namespace products || kubectl create namespace products
-          
-          # Use o latest tag no deploy
-          kubectl set image deployment/products-service products-service=131793876715.dkr.ecr.us-east-1.amazonaws.com/microservices/products:latest -n products || kubectl apply -f tech/k8s/deployment.yaml
-          
-          # Verifique se o serviço já existe, senão, aplique-o
-          if [ -f tech/k8s/service.yaml ]; then
-            kubectl apply -f tech/k8s/service.yaml
+          # Aplicar NetworkPolicy se existir
+          if [ -f k8s/products-service/NetworkPolicy.yaml ]; then
+            kubectl apply -f k8s/products-service/NetworkPolicy.yaml
           fi
           
-          # Verifique o status do rollout
+          # Verificar se o arquivo secret.yaml está no GitIgnore por segurança
+          if [ -f .gitignore ]; then
+            echo "Verificando se secrets estão configurados para serem ignorados pelo Git..."
+            grep -q "secret.yaml" .gitignore || echo "AVISO: secret.yaml pode não estar no .gitignore"
+          fi
+          
+          # Aplicar o deployment principal
+          kubectl set image deployment/products-service products-service=131793876715.dkr.ecr.us-east-1.amazonaws.com/microservices/products:latest -n products || kubectl apply -f k8s/products-service/deployment.yaml
+          
+          # Aplicar o deployment do MongoDB se necessário
+          if [ -f k8s/products-service/deployment-mongo.yaml ]; then
+            kubectl apply -f k8s/products-service/deployment-mongo.yaml
+          fi
+          
+          # Aplicar o serviço
+          kubectl apply -f k8s/products-service/service.yaml
+          
+          # Aplicar o ingress se existir
+          if [ -f k8s/products-service/ingress.yaml ]; then
+            kubectl apply -f k8s/products-service/ingress.yaml
+          fi
+          
+          # Verificar o status do rollout
           kubectl rollout status deployment/products-service -n products --timeout=300s

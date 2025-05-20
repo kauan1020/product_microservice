@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: products-service
-  namespace: microservices
+  namespace: products
 spec:
   replicas: 1
   selector:
@@ -16,7 +16,7 @@ spec:
       containers:
       - name: products-service
 #        image: 264591339294.dkr.ecr.us-east-1.amazonaws.com/products-service:latest
-        image: kauan4453/products-microservice:latest
+        image: 131793876715.dkr.ecr.us-east-1.amazonaws.com/microservices/products
         imagePullPolicy: Always
         ports:
         - containerPort: 8002

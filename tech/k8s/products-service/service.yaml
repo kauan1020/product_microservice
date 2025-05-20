@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: products-service
-  namespace: microservices
+  namespace: products
 spec:
   selector:
     app: products-service
