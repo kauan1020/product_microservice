@@ -144,19 +144,3 @@ class TestSecurity:
         mock_pwd_context.verify.assert_called_once_with("12345678901", "hashed_cpf")
         assert result is True
 
-
-@pytest.mark.skip("Integration test that requires database connection")
-class TestDatabaseConnection:
-    def test_get_session(self):
-        from tech.infra.databases.database import get_session
-
-        session_generator = get_session()
-        session = next(session_generator)
-
-        assert isinstance(session, Session)
-
-        # Clean up session
-        try:
-            next(session_generator)
-        except StopIteration:
-            pass

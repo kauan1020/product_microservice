@@ -11,8 +11,21 @@ spec:
   - Egress
   egress:
   - to:
-    - ipBlock:
-        cidr: 0.0.0.0/0  # Permita conexões para qualquer IP externo
+    - podSelector:
+        matchLabels:
+          app: mongodb-local
     ports:
     - protocol: TCP
       port: 27017
+  - to:  # Permita acesso ao DNS para resolução de nomes
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
