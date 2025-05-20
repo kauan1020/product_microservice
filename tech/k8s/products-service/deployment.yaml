@@ -15,7 +15,8 @@ spec:
     spec:
       containers:
       - name: products-service
-        image: 264591339294.dkr.ecr.us-east-1.amazonaws.com/products-service:latest
+#        image: 264591339294.dkr.ecr.us-east-1.amazonaws.com/products-service:latest
+        image: kauan4453/products-microservice:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8002
