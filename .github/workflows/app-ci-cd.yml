@@ -13,7 +13,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Necessário para o SonarQube analisar histórico
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -28,11 +28,15 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          pytest --cov=. --cov-report=xml:coverage.xml --cov-report=term
+          cd tech
+          pytest tests --cov=. --cov-report=xml:../coverage.xml --cov-report=term
+          cd ..
 
       - name: Run BDD tests with Behave
         run: |
-          behave
+          cd tech
+          behave tests/tech/bdd/features/
+          cd ..
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@master
@@ -60,13 +64,20 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: 264591339294.dkr.ecr.us-east-1.amazonaws.com/products-service:latest,264591339294.dkr.ecr.us-east-1.amazonaws.com/products-service:${{ github.sha }}  # Adicionada tag com SHA para rastreabilidade
+          tags: |
+            131793876715.dkr.ecr.us-east-1.amazonaws.com/microservices/products:latest
+            131793876715.dkr.ecr.us-east-1.amazonaws.com/microservices/products:${{ github.sha }}
           platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
     needs: test-and-build
@@ -96,19 +107,13 @@ jobs:
         run: |
           kubectl get namespace products || kubectl create namespace products
           
-          envsubst < k8s/deployment.yaml | kubectl apply -f -
+          # Use o latest tag no deploy
+          kubectl set image deployment/products-service products-service=131793876715.dkr.ecr.us-east-1.amazonaws.com/microservices/products:latest -n products || kubectl apply -f k8s/deployment.yaml
           
+          # Verifique se o serviço já existe, senão, aplique-o
           if [ -f k8s/service.yaml ]; then
             kubectl apply -f k8s/service.yaml
           fi
           
-          kubectl rollout status deployment/products-service -n products
-
-      - name: Notify deployment status
-        if: always()
-        run: |
-          if [ "${{ job.status }}" == "success" ]; then
-            echo "Deployment completed successfully!"
-          else
-            echo "Deployment failed!"
-          fi
+          # Verifique o status do rollout
+          kubectl rollout status deployment/products-service -n products --timeout=300s

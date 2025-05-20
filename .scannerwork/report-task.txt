@@ -1,0 +1,6 @@
+projectKey=products_microservice
+serverUrl=http://localhost:53927
+serverVersion=9.9.8.100196
+dashboardUrl=http://localhost:53927/dashboard?id=products_microservice
+ceTaskId=AZbrdt1NROHgnkzo0YPb
+ceTaskUrl=http://localhost:53927/api/ce/task?id=AZbrdt1NROHgnkzo0YPb
