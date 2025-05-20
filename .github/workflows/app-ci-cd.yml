@@ -26,53 +26,54 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev libgmp-dev
 
-      # Configurar Poetry com cache
+      # Configurar Poetry
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
-          version: 1.7.1  # Usando uma versão mais recente do Poetry
+          version: 1.7.1
           virtualenvs-create: true
-          virtualenvs-in-project: true
+          virtualenvs-in-project: false  # Alterado para false para usar o local padrão
 
       - name: Cache Poetry dependencies
         uses: actions/cache@v3
         with:
-          path: .venv
+          path: ~/.cache/pypoetry
           key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
           restore-keys: |
             ${{ runner.os }}-poetry-
 
-      # Instalar dependências com Poetry
+      # Instalar dependências com Poetry na raiz do projeto, não dentro do diretório tech
       - name: Install dependencies
         run: |
-          # Tente instalar normalmente primeiro
-          poetry install --no-interaction || true
+          # Exibir a configuração atual do Poetry
+          poetry config --list
           
-          # Se houver problemas com pycrypto, tente instalar manualmente cryptography em vez disso
-          if ! poetry check; then
-            pip install cryptography
-            # Remova pycrypto e adicione pycryptodome como alternativa moderna
-            poetry remove pycrypto || true
-            poetry add pycryptodome || true
-            # Tente instalar novamente
-            poetry install --no-interaction
-          fi
+          # Instalar dependências diretamente na raiz do projeto
+          poetry install --no-interaction
           
-          # Adicionar dependências de teste
-          poetry add pytest-cov --group dev
+          # Adicionar dependências de teste se não estiverem no pyproject.toml
+          poetry add pytest-cov behave --group dev || true
+          
+          # Verificar se as dependências foram instaladas corretamente
+          poetry show
+          poetry run pip list
 
-      # Executar testes
+      # Executar testes usando poetry run explicitamente
       - name: Run unit tests with coverage
         run: |
-          cd tech
-          poetry run pytest tests --cov=. --cov-report=xml:../coverage.xml --cov-report=term
-          cd ..
+          # Verificar a estrutura do diretório
+          ls -la
+          
+          # Executar os testes na raiz
+          poetry run pytest tech/tests --cov=tech --cov-report=xml:coverage.xml --cov-report=term
 
-      - name: Run BDD tests with Behave
+      - name: Run BDD tests with Behave (if available)
         run: |
-          cd tech
-          poetry run behave tests/tech/bdd/features/ || echo "BDD tests may not be set up yet"
-          cd ..
+          if [ -d "tech/tests/tech/bdd/features/" ]; then
+            poetry run behave tech/tests/tech/bdd/features/
+          else
+            echo "BDD tests directory not found, skipping"
+          fi
 
       # SonarQube scan
       - name: SonarQube Scan
