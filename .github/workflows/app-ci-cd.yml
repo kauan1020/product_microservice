@@ -56,7 +56,6 @@ jobs:
           fi
           
           poetry config virtualenvs.create false
-          poetry config experimental.new-installer false
           
           # Voltar para a raiz se mudamos para tech/
           if [ -f "pyproject.toml" ]; then
@@ -72,7 +71,7 @@ jobs:
             pip install --no-cache-dir certifi==2024.2.2 pymongo[srv]==4.6.1
             
             # Tentar instalar com Poetry
-            poetry install --no-interaction || poetry install --no-interaction --no-dev
+            poetry install --no-interaction || poetry install --no-interaction --without dev
           elif [ -f "tech/pyproject.toml" ]; then
             echo "pyproject.toml encontrado na pasta tech"
             cd tech
@@ -80,7 +79,7 @@ jobs:
             pip install --no-cache-dir certifi==2024.2.2 pymongo[srv]==4.6.1
             
             # Tentar instalar com Poetry
-            poetry install --no-interaction || poetry install --no-interaction --no-dev
+            poetry install --no-interaction || poetry install --no-interaction --without dev
             cd ..
           else
             echo "Não foi possível encontrar pyproject.toml"
