@@ -28,9 +28,10 @@ jobs:
           virtualenvs-in-project: false  # Alterado para false para usar o ambiente global
 
       - name: List directory structure
-        run: ls -la && pwd
+        run: ls -la && ls -la tech && pwd
 
       - name: Install dependencies with Poetry
+        working-directory: ./tech  # Define o diretório de trabalho como ./tech onde está o pyproject.toml
         run: |
           # Instalação das dependências do projeto
           poetry install
@@ -39,19 +40,25 @@ jobs:
           # Lista as dependências instaladas para debug
           poetry show
 
-      - name: List Python packages
-        run: |
-          pip list
-
       - name: Run unit tests with coverage
+        working-directory: ./tech  # Define o diretório de trabalho
         run: |
           # Executa diretamente no ambiente do Poetry
-          poetry run pytest tech/tests --cov=tech --cov-report=xml:coverage.xml --cov-report=term || echo "Testes falharam, mas continuando o pipeline"
+          poetry run pytest tests --cov=tech --cov-report=xml:coverage.xml --cov-report=term || echo "Testes falharam, mas continuando o pipeline"
 
       - name: Run BDD tests with Behave
+        working-directory: ./tech  # Define o diretório de trabalho
         run: |
           # Executa diretamente no ambiente do Poetry
-          poetry run behave tech/tests/tech/bdd/features/ || echo "Testes BDD falharam, mas continuando o pipeline"
+          # Ajuste o caminho conforme a estrutura real do seu projeto
+          poetry run behave tests/bdd/features/ || echo "Testes BDD falharam, mas continuando o pipeline"
+
+      - name: Move coverage reports to root
+        run: |
+          # Move os relatórios de cobertura para a raiz para o SonarQube
+          if [ -f tech/coverage.xml ]; then
+            cp tech/coverage.xml ./coverage.xml
+          fi
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@master
@@ -64,8 +71,8 @@ jobs:
             -Dsonar.projectName="Products Microservice"
             -Dsonar.sources=tech
             -Dsonar.python.coverage.reportPaths=coverage.xml
-            -Dsonar.exclusions=**/__pycache__/**,**/tests/**,**/*.html,**/htmlcov/**
-            -Dsonar.coverage.exclusions=tests/**/*,**/test_*.py,**/__init__.py
+            -Dsonar.exclusions=**/__pycache__/**,**/tests/**,**/*.html,**/htmlcov/**,**/.scannerwork/**
+            -Dsonar.coverage.exclusions=**/tests/**/*,**/test_*.py,**/__init__.py
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -85,7 +92,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: .
+          context: ./tech  # Ajustado para usar o diretório tech como contexto
+          file: ./tech/Dockerfile  # Caminho para o Dockerfile
           push: true
           tags: |
             131793876715.dkr.ecr.us-east-1.amazonaws.com/microservices/products:latest
@@ -125,11 +133,11 @@ jobs:
           kubectl get namespace products || kubectl create namespace products
           
           # Use o latest tag no deploy
-          kubectl set image deployment/products-service products-service=131793876715.dkr.ecr.us-east-1.amazonaws.com/microservices/products:latest -n products || kubectl apply -f k8s/deployment.yaml
+          kubectl set image deployment/products-service products-service=131793876715.dkr.ecr.us-east-1.amazonaws.com/microservices/products:latest -n products || kubectl apply -f tech/k8s/deployment.yaml
           
           # Verifique se o serviço já existe, senão, aplique-o
-          if [ -f k8s/service.yaml ]; then
-            kubectl apply -f k8s/service.yaml
+          if [ -f tech/k8s/service.yaml ]; then
+            kubectl apply -f tech/k8s/service.yaml
           fi
           
           # Verifique o status do rollout
