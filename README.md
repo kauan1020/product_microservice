@@ -82,8 +82,11 @@ behave tests/tech/bdd/features/ --tags=checkout
 ### Cobertura de Testes
 
 
-![Cobertura de Testes](.coverage.png)
+![Cobertura de Testes](coverage.png)
 
+![BDD.png](BDD.png)
+
+![sonar.png](sonar.png)
 > **Nota**: A imagem acima mostra a estrutura de diretórios de teste, incluindo nossos testes BDD que seguem a metodologia Gherkin para definir cenários de negócio.
 
 ## Repositórios Relacionados
