@@ -55,6 +55,8 @@ O serviço utiliza MongoDB como banco de dados principal. A estrutura básica in
 
 ```bash
 # Execute todos os testes
+cd tech
+
 pytest
 
 # Execute testes com cobertura
@@ -69,6 +71,8 @@ pytest --cov=tech --cov-report=html tests/
 O projeto utiliza testes BDD (Behavior-Driven Development) com Behave para garantir que os requisitos de negócio sejam atendidos.
 
 ```bash
+cd tech
+
 # Execute todos os testes BDD
 behave tests/tech/bdd/features/
 
