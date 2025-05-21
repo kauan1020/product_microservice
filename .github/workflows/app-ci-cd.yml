@@ -5,15 +5,18 @@ on:
     branches: [ main, master, develop ]
   pull_request:
     branches: [ main, master ]
+  repository_dispatch:
+    types: [trigger-deployment]
 
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
+    if: github.event_name != 'repository_dispatch'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Necessário para o SonarQube analisar histórico
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -25,36 +28,30 @@ jobs:
         with:
           version: 1.5.1
           virtualenvs-create: true
-          virtualenvs-in-project: false  # Alterado para false para usar o ambiente global
+          virtualenvs-in-project: false
 
       - name: List directory structure
         run: ls -la && ls -la tech && find tech -type d | sort
 
       - name: Install dependencies with Poetry
-        working-directory: ./tech  # Define o diretório de trabalho como ./tech onde está o pyproject.toml
+        working-directory: ./tech
         run: |
-          # Instalação das dependências do projeto
           poetry install
-          # Instalação explícita das dependências de teste
           poetry add pytest pytest-cov behave coverage --group dev
-          # Lista as dependências instaladas para debug
           poetry show
 
       - name: Run unit tests with coverage
-        working-directory: ./tech  # Define o diretório de trabalho
+        working-directory: ./tech
         run: |
-          # Executa diretamente no ambiente do Poetry
           poetry run pytest tests --cov=tech --cov-report=xml:coverage.xml --cov-report=term
 
       - name: Run BDD tests with Behave
-        working-directory: ./tech  # Define o diretório de trabalho
+        working-directory: ./tech
         run: |
-          # Executa diretamente no ambiente do Poetry com o caminho correto
           poetry run behave tests/tech/bdd/features
 
       - name: Move coverage reports to root
         run: |
-          # Move os relatórios de cobertura para a raiz para o SonarQube
           if [ -f tech/coverage.xml ]; then
             cp tech/coverage.xml ./coverage.xml
           fi
@@ -91,8 +88,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: ./tech  # Ajustado para usar o diretório tech como contexto
-          file: ./tech/Dockerfile  # Caminho para o Dockerfile
+          context: ./tech
+          file: ./tech/Dockerfile
           push: true
           tags: |
             131793876715.dkr.ecr.us-east-1.amazonaws.com/microservices/products:latest
@@ -103,10 +100,10 @@ jobs:
           build-args: |
             POETRY_VERSION=1.5.1
 
-  deploy:
+  deploy-normal:
     needs: test-and-build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name != 'repository_dispatch'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -129,7 +126,6 @@ jobs:
 
       - name: Create namespace if needed
         run: |
-          # Usar o arquivo namespace.yaml se existir
           if [ -f tech/k8s/products-service/namespace.yaml ]; then
             kubectl apply -f tech/k8s/products-service/namespace.yaml
           else
@@ -138,23 +134,99 @@ jobs:
 
       - name: Deploy to Kubernetes
         run: |
-          # Aplicar NetworkPolicy se existir
           if [ -f tech/k8s/products-service/NetworkPolicy.yaml ]; then
             kubectl apply -f tech/k8s/products-service/NetworkPolicy.yaml
           fi
           
-          # Aplicar o deployment principal
+          if [ -f tech/k8s/products-service/job.yaml ]; then
+            JOB_NAME=$(grep -o 'name: [a-zA-Z0-9-]*' tech/k8s/products-service/job.yaml | head -1 | awk '{print $2}')
+            kubectl delete job $JOB_NAME -n products --ignore-not-found=true
+            kubectl apply -f tech/k8s/products-service/job.yaml
+          fi
+          
           kubectl set image deployment/products-service products-service=131793876715.dkr.ecr.us-east-1.amazonaws.com/microservices/products:latest -n products || kubectl apply -f tech/k8s/products-service/deployment.yaml
           
-          # Aplicar o deployment do MongoDB se necessário
           if [ -f tech/k8s/products-service/deployment-mongo.yaml ]; then
             kubectl apply -f tech/k8s/products-service/deployment-mongo.yaml
           fi
           
-          # Aplicar o serviço
           kubectl apply -f tech/k8s/products-service/service.yaml
           
-          # Aplicar o ingress se existir
+          if [ -f tech/k8s/products-service/ingress.yaml ]; then
+            kubectl apply -f tech/k8s/products-service/ingress.yaml
+          fi
+
+      - name: Trigger other microservices
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.GH_PAT }}" \
+            https://api.github.com/repos/kauan1020/payments_microservice/dispatches \
+            -d '{"event_type":"trigger-deployment","client_payload":{"repository":"product_microservice"}}'
+            
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.GH_PAT }}" \
+            https://api.github.com/repos/kauan1020/users_microservice/dispatches \
+            -d '{"event_type":"trigger-deployment","client_payload":{"repository":"product_microservice"}}'
+            
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.GH_PAT }}" \
+            https://api.github.com/repos/kauan1020/orders_microservice/dispatches \
+            -d '{"event_type":"trigger-deployment","client_payload":{"repository":"product_microservice"}}'
+
+  deploy-triggered:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'repository_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name tech-eks-cluster --region us-east-1
+
+      - name: Create namespace if needed
+        run: |
+          if [ -f tech/k8s/products-service/namespace.yaml ]; then
+            kubectl apply -f tech/k8s/products-service/namespace.yaml
+          else
+            kubectl get namespace products || kubectl create namespace products
+          fi
+
+      - name: Deploy to Kubernetes
+        run: |
+          if [ -f tech/k8s/products-service/NetworkPolicy.yaml ]; then
+            kubectl apply -f tech/k8s/products-service/NetworkPolicy.yaml
+          fi
+          
+          if [ -f tech/k8s/products-service/job.yaml ]; then
+            JOB_NAME=$(grep -o 'name: [a-zA-Z0-9-]*' tech/k8s/products-service/job.yaml | head -1 | awk '{print $2}')
+            kubectl delete job $JOB_NAME -n products --ignore-not-found=true
+            kubectl apply -f tech/k8s/products-service/job.yaml
+          fi
+          
+          kubectl set image deployment/products-service products-service=131793876715.dkr.ecr.us-east-1.amazonaws.com/microservices/products:latest -n products || kubectl apply -f tech/k8s/products-service/deployment.yaml
+          
+          if [ -f tech/k8s/products-service/deployment-mongo.yaml ]; then
+            kubectl apply -f tech/k8s/products-service/deployment-mongo.yaml
+          fi
+          
+          kubectl apply -f tech/k8s/products-service/service.yaml
+          
           if [ -f tech/k8s/products-service/ingress.yaml ]; then
             kubectl apply -f tech/k8s/products-service/ingress.yaml
           fi
