@@ -1,4 +1,3 @@
-# tech/infra/factories/product_repository_factory.py
 import os
 from tech.interfaces.repositories.product_repository import ProductRepository
 from tech.infra.repositories.mongodb_product_repository import MongoDBProductRepository

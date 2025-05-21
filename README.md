@@ -1,138 +1,93 @@
-# Documentação do Projeto
+# Microsserviço de Pagamentos
 
-## Desenho da Arquitetura
+Este repositório contém o microsserviço de pagamentos responsável por gerenciar as transações financeiras da plataforma.
 
-Este sistema foi projetado para resolver os problemas enfrentados por um restaurante que está expandindo, mas sofre com dificuldades no gerenciamento de pedidos devido ao aumento na demanda. A solução é composta por uma aplicação de autoatendimento integrada a uma infraestrutura escalável, utilizando **FastAPI** como framework backend, **SQLAlchemy** e **Alembic** para manipulação de dados e migração de banco, e **Kubernetes** (via Minikube) para orquestração de contêineres.
+## Tecnologias
 
----
+- **Framework**: FastAPI
+- **Linguagem**: Python 3.10+
+- **Banco de Dados**: MongoDB
+- **Testes**: Pytest + Coverage
 
-## 1. Requisitos do Negócio
+## Estrutura do Projeto
 
-### Melhoria na Experiência do Cliente:
-- Totens de autoatendimento para permitir que os clientes façam seus pedidos sem intervenção de atendentes.
-- Apresentação de produtos (lanche, bebida, acompanhamento, sobremesa) com preço e descrição.
-- Sistema de pagamento integrado via QR Code (Mercado Pago).
-- Rastreamento do status do pedido pelo cliente em tempo real: **Recebido → Em preparação → Pronto → Finalizado**.
-- Notificação do cliente quando o pedido estiver pronto para retirada.
+```
+tech/
+├── api/
+│   └── payments_router.py
+├── domain/
+│   └── entities/
+├── infra/
+│   └── repositories/
+├── interfaces/
+│   ├── controllers/
+│   └── schemas/
+└── use_cases/
+    └── payments/
+```
 
-### Gestão para a Cozinha e Administração:
-- Garantir que os pedidos pagos sejam enviados automaticamente para a cozinha, com visibilidade em painéis administrativos.
-- Sistema administrativo para gerenciar produtos, clientes e promoções.
+## Configuração do Ambiente
 
-### Problema Atual de Performance:
-- **Totem de autoatendimento enfrenta lentidão em horários de pico.**
-- **Solução proposta**: Implementação de um sistema escalável, que usa Kubernetes e Horizontal Pod Autoscaler (HPA), garantindo maior disponibilidade e desempenho durante picos de uso.
+### Requisitos
 
----
+- Python 3.10+
+- MongoDB 5.0+
 
-## 2. Requisitos de Infraestrutura
 
-### 2.1 Cluster Kubernetes
-- **Orquestrador**: Minikube (ambiente local para desenvolvimento).
-- **Recursos Kubernetes**:
-  - **Deployments**: Cada serviço possui réplicas gerenciadas para disponibilidade.
-  - **Horizontal Pod Autoscaler (HPA)**: Escala os pods de acordo com a carga da aplicação (CPU/memória).
-  - **Secrets**: Para armazenar dados sensíveis, como credenciais do banco de dados e chave da API do Mercado Pago.
-  - **ConfigMaps**: Para armazenar configurações não sensíveis, como categorias fixas (lanche, bebida, etc.).
-  - **Persistent Volume (PV)** e **Persistent Volume Claim (PVC)**: Para garantir persistência de dados do PostgreSQL.
+## Banco de Dados
 
-### 2.2 Serviços da Aplicação
-O sistema é dividido em **quatro serviços principais**:
+O serviço utiliza MongoDB como banco de dados principal. A estrutura básica inclui:
 
-#### **2.2.1 Serviço de Pedidos**
-- **API**: `/orders`
-- **Funcionalidade**:
-  - Realiza o checkout do pedido.
-  - Retorna o status do pedido.
-  - Atualiza o status do pedido conforme ele avança no fluxo.
-  - Exclui pedidos.
-- **Banco de Dados**:
-  - Relaciona os pedidos aos produtos (muitos-para-muitos).
-  - Salva histórico de status.
-- **Exemplo**:
-  - **POST** `/orders/checkout`: Cria um pedido.
-  - **GET** `/orders`: Lista pedidos com prioridade (**Pronto > Em preparação > Recebido**).
+- **Database**: `payments_db`
+- **Collections**: `payments`, `payment_methods`
 
-#### **2.2.2 Serviço de Pagamento**
-- **API**: `/payments`
-- **Funcionalidade**:
-  - Integração com Mercado Pago para gerar QR Code.
-  - Gerencia o status do pagamento.
-  - Recebe atualizações via Webhook.
-- **Banco de Dados**:
-  - Armazena transações e status (**Aprovado/Rejeitado**).
-- **Exemplo**:
-  - **POST** `/payments`: Gera QR Code.
-  - **POST** `/payments/webhook`: Atualiza status do pagamento.
+## Endpoints da API
 
-#### **2.2.3 Serviço de Produtos**
-- **API**: `/products`
-- **Funcionalidade**:
-  - Gerencia produtos disponíveis no sistema (CRUD completo).
-  - Filtra produtos por categoria.
-- **Banco de Dados**:
-  - Armazena categorias, descrições, preços e imagens.
-- **Exemplo**:
-  - **POST** `/products`: Cria novo produto.
-  - **GET** `/products/{categoria}`: Lista produtos por categoria.
+- `GET /api/payments/` - Lista pagamentos
+- `GET /api/payments/{id}` - Obtém um pagamento específico
+- `POST /api/payments/` - Cria um novo pagamento
+- `PUT /api/payments/{id}` - Atualiza um pagamento
+- `DELETE /api/payments/{id}` - Remove um pagamento
 
-#### **2.2.4 Serviço de Usuários**
-- **API**: `/users`
-- **Funcionalidade**:
-  - Gerencia o cadastro e dados de clientes.
-  - Recupera informações por CPF.
-- **Banco de Dados**:
-  - Relaciona clientes aos pedidos realizados.
-- **Exemplo**:
-  - **POST** `/users`: Cadastra cliente.
-  - **GET** `/users/cpf/{cpf}`: Busca cliente pelo CPF.
+## Testes
 
-### 2.3 Banco de Dados
-- **PostgreSQL**:
-  - Gerenciado dentro do cluster Kubernetes, com armazenamento persistente configurado via PV/PVC.
-  - Esquema relacional projetado para suportar consultas rápidas e integridade de dados.
-  - **Migrações de Esquema**: Feitas utilizando **Alembic**, garantindo versionamento do banco.
+### Executando Testes Unitários
 
----
+```bash
+# Execute todos os testes
+pytest
 
-## 3. Diagrama de Arquitetura
+# Execute testes com cobertura
+pytest --cov=tech tests/
 
-## 4. Configurações Detalhadas
+# Gere relatório de cobertura
+pytest --cov=tech --cov-report=html tests/
+```
 
-### **ConfigMap**
-- Contém informações não sensíveis:
-  - URLs da API do Mercado Pago.
-  - Categorias de produtos.
+### Executando Testes BDD
 
-### **Secrets**
-- Armazena credenciais e chaves sensíveis:
-  - Credenciais do PostgreSQL.
-  - Chave da API Mercado Pago.
+O projeto utiliza testes BDD (Behavior-Driven Development) com Behave para garantir que os requisitos de negócio sejam atendidos.
 
-### **Horizontal Pod Autoscaler (HPA)**
-- Configurado para escalar dinamicamente:
-  - **Pedidos API**: De 2 a 5 réplicas com base em 50% de uso da CPU.
-  - **Pagamento API**: De 1 a 5 réplicas com base em 70% de uso da CPU.
+```bash
+# Execute todos os testes BDD
+behave tests/tech/bdd/features/
 
-### **Persistent Volume (PV)**
-- Garante persistência dos dados do banco, mesmo em caso de reinicialização:
-  - 10 GB de armazenamento local configurado no Minikube.
+# Execute um cenário específico
+behave tests/tech/bdd/features/orders.feature
 
----
+# Execute testes BDD com tags específicas
+behave tests/tech/bdd/features/ --tags=checkout
+```
 
-## 5. Solução para Problema de Performance
+### Cobertura de Testes
 
-- **Problema**: Totem de autoatendimento sofre com lentidão durante picos de tráfego.
-- **Solução**:
-  - Implementação de **HPA** para escalar automaticamente o backend.
-  - Configuração de **Ingress Controller** para balancear o tráfego entre os pods.
-  - Banco de dados com armazenamento persistente para maior confiabilidade.
 
----
+![Cobertura de Testes](.coverage.png)
 
-## 6. Tecnologias Utilizadas
+> **Nota**: A imagem acima mostra a estrutura de diretórios de teste, incluindo nossos testes BDD que seguem a metodologia Gherkin para definir cenários de negócio.
 
-- **Backend**: FastAPI, SQLAlchemy, Alembic.
-- **Banco de Dados**: PostgreSQL.
-- **Orquestração**: Kubernetes (via Minikube).
-- **Integração de Pagamento**: Mercado Pago.
+## Repositórios Relacionados
+
+- [Microsserviço de Produtos](https://github.com/sua-organizacao/products-microservice)
+- [Microsserviço de Usuários](https://github.com/sua-organizacao/users-microservice)
+- [API Gateway](https://github.com/sua-organizacao/api-gateway)
