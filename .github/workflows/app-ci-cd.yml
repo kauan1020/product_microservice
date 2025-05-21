@@ -158,6 +158,3 @@ jobs:
           if [ -f tech/k8s/products-service/ingress.yaml ]; then
             kubectl apply -f tech/k8s/products-service/ingress.yaml
           fi
-          
-          # Verificar o status do rollout
-          kubectl rollout status deployment/products-service -n products --timeout=300s
